@@ -170,7 +170,14 @@
 
 In `src/threads/thread.h`, add these members to `struct thread`:
 
- 
+```c
+int original_priority;            /* Priority assigned at creation or via thread_set_priority() */
+struct list donors;               /* List of threads that have donated their priority to us */
+struct list_elem donor_elem;      /* Element for being in another thread's donors list */
+struct lock *waiting_on_lock;     /* The lock this thread is currently blocked on, or NULL */
+```
+
+Why each field matters:
 
 - `original_priority` — separates the thread's "base" priority from temporary boosts. When all donations are removed the thread falls back to this value.
 - `donors` — a list of all threads whose priority has been donated *to this thread*. A thread can receive donations from multiple waiters across multiple locks.
@@ -202,6 +209,24 @@ cur->waiting_on_lock = lock;
 
 2. If the lock is already held, donate our priority up the chain:
 
+```c
+if (lock->holder != NULL)
+  {
+    list_insert_ordered (&lock->holder->donors, &cur->donor_elem,
+                         thread_priority_greater, NULL);
+
+    struct lock *l = lock;
+    int depth = 0;
+    while (l != NULL && l->holder != NULL && depth < 8)
+      {
+        if (cur->priority > l->holder->priority)
+          l->holder->priority = cur->priority;
+        l = l->holder->waiting_on_lock;
+        depth++;
+      }
+  }
+```
+
 Concrete trace through `priority-donate-nest`:
 
 - Thread L (pri 31) holds lock A.
@@ -217,7 +242,34 @@ lock->holder = cur;
 
 You should disable interrupts around the donation section (before `sema_down()`) to prevent a timer interrupt from seeing inconsistent state:
 
+```c
+enum intr_level old_level = intr_disable ();
+cur->waiting_on_lock = lock;
+/* donation chain walk here */
+intr_set_level (old_level);
+sema_down (&lock->semaphore);
+old_level = intr_disable ();
+cur->waiting_on_lock = NULL;
+lock->holder = cur;
+intr_set_level (old_level);
+```
+
 **Step 4 — Implement the priority recomputation helper (**`src/threads/thread.c`**)**
+
+```c
+void
+thread_recompute_priority (struct thread *t)
+{
+  t->priority = t->original_priority;
+  if (!list_empty (&t->donors))
+    {
+      struct thread *top_donor = list_entry (list_front (&t->donors),
+                                             struct thread, donor_elem);
+      if (top_donor->priority > t->priority)
+        t->priority = top_donor->priority;
+    }
+}
+```
 
 This works because `donors` is kept sorted in descending priority order (highest-priority donor at the front via `list_insert_ordered`). Checking the front element is O(1).
 
@@ -231,7 +283,24 @@ void thread_recompute_priority (struct thread *);
 
 Before the existing `sema_up()` call, remove all donors that were waiting on the lock being released, then recalculate priority:
 
- 
+```c
+struct thread *cur = thread_current ();
+
+struct list_elem *e = list_begin (&cur->donors);
+while (e != list_end (&cur->donors))
+  {
+    struct thread *t = list_entry (e, struct thread, donor_elem);
+    if (t->waiting_on_lock == lock)
+      e = list_remove (e);
+    else
+      e = list_next (e);
+  }
+
+thread_recompute_priority (cur);
+
+lock->holder = NULL;
+sema_up (&lock->semaphore);
+```
 
 Trace through `priority-donate-multiple`:
 
@@ -249,6 +318,16 @@ Trace through `priority-donate-multiple2`:
 **Step 6 — Add a yield check after** `sema_up()` **in** `lock_release()`
 
 After `sema_up()` unblocks a waiter, that waiter may have higher priority than the current thread (whose priority just dropped):
+
+```c
+if (!list_empty (&ready_list))
+  {
+    struct thread *front = list_entry (list_front (&ready_list),
+                                       struct thread, elem);
+    if (front->priority > thread_current ()->priority)
+      thread_yield ();
+  }
+```
 
 Or more simply, if you have a helper already:
 
@@ -316,6 +395,25 @@ This is not a single location — it is a principle enforced everywhere:
 
 **Step 1 — Rewrite** `thread_set_priority()`
 
+```c
+void
+thread_set_priority (int new_priority)
+{
+  struct thread *cur = thread_current ();
+  cur->original_priority = new_priority;
+  thread_recompute_priority (cur);
+
+  /* If we no longer have the highest priority, yield. */
+  if (!list_empty (&ready_list))
+    {
+      struct thread *front = list_entry (list_front (&ready_list),
+                                         struct thread, elem);
+      if (front->priority > cur->priority)
+        thread_yield ();
+    }
+}
+```
+
 Key points:
 
 - Only `original_priority` is set to `new_priority`. The effective `priority` is then recalculated via `thread_recompute_priority()`, which takes the max of `original_priority` and the highest active donation.
@@ -323,7 +421,13 @@ Key points:
 
 **Step 2 — Rewrite** `thread_get_priority()`
 
- 
+```c
+int
+thread_get_priority (void)
+{
+  return thread_current ()->priority;
+}
+```
 
 This function is actually unchanged from the original skeleton. The `priority` field is already the *effective* priority once donation logic is in place. No extra work is needed here.
 

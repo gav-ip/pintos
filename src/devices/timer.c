@@ -30,6 +30,20 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/** list of threads that are blocked and waiting to be woken up */
+static struct list sleep_list;
+
+
+/** Comparator for `list_insert_ordered()` to sort threads by `wakeup_tick`. */
+static bool wakeup_tick_less(const struct list_elem *a,
+                             const struct list_elem *b, 
+                             void *aux UNUSED) 
+{
+  struct thread *t1 = list_entry(a, struct thread, elem);
+  struct thread *t2 = list_entry(b, struct thread, elem);
+  return t1->wakeup_tick < t2->wakeup_tick;
+}
+
 /** Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +51,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&sleep_list);
 }
 
 /** Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,11 +104,17 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  if (ticks <= 0)
+    return;
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+
+  enum intr_level old_level = intr_disable ();
+  struct thread *cur = thread_current ();
+  cur->wakeup_tick = timer_ticks () + ticks;
+  list_insert_ordered (&sleep_list, &cur->elem, wakeup_tick_less, NULL);
+  thread_block ();
+  intr_set_level (old_level);
 }
 
 /** Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +193,16 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  while (!list_empty (&sleep_list))
+    {
+      struct list_elem *front = list_front (&sleep_list);
+      struct thread *t = list_entry (front, struct thread, elem);
+      if (t->wakeup_tick > ticks)
+        break;
+      list_remove (front);
+      thread_unblock (t);
+    }
 }
 
 /** Returns true if LOOPS iterations waits for more than one timer
