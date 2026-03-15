@@ -80,7 +80,7 @@ void thread_recompute_priority (struct thread *t)
   t->priority = t->original_priority;
   if (!list_empty (&t->donors))
   {
-    struct thread *top_donor = list_entry (list_front (&t->donors),
+    struct thread *top_donor = list_entry (list_max (&t->donors, thread_priority_greater, NULL),
                                            struct thread, donor_elem);
     if (top_donor->priority > t->priority)
       t->priority = top_donor->priority;
