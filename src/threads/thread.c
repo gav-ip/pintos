@@ -73,6 +73,19 @@ static tid_t allocate_tid (void);
 static bool thread_priority_greater (const struct list_elem *a,
                                      const struct list_elem *b,
                                      void *aux UNUSED);
+void thread_recompute_priority (struct thread *t);
+
+void thread_recompute_priority (struct thread *t)
+{
+  t->priority = t->original_priority;
+  if (!list_empty (&t->donors))
+  {
+    struct thread *top_donor = list_entry (list_front (&t->donors),
+                                           struct thread, donor_elem);
+    if (top_donor->priority > t->priority)
+      t->priority = top_donor->priority;
+  }
+}
 
 /** Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -354,7 +367,18 @@ thread_priority_greater (const struct list_elem *a,
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *cur = thread_current ();
+  cur->original_priority = new_priority;
+  thread_recompute_priority (cur);
+
+  /** If we no longer have the highest priority, yield. */
+  if (!list_empty (&ready_list))
+  {
+    struct thread *front = list_entry (list_front (&ready_list),
+                                       struct thread, elem);
+    if (front->priority > cur->priority)
+      thread_yield ();
+  }
 }
 
 /** Returns the current thread's priority. */
@@ -481,6 +505,12 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  /** Every new threads starts with no donors and no waiting lock */
+  t->original_priority = priority;
+  list_init(&t->donors);
+  t->waiting_on_lock = NULL;
+
   t->wakeup_tick = 0;
   t->magic = THREAD_MAGIC;
 
