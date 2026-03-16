@@ -255,7 +255,7 @@ void lock_release(struct lock *lock) {
   lock->holder = NULL;
 
   struct thread *cur = thread_current();
-  /** Remove all donors whose waiting_on_lock matches the released lock */
+  /** Remove all donors whosidebarse waiting_on_lock matches the released lock */
   struct list_elem *e = list_begin(&cur->donors);
   while (e != list_end(&cur->donors)) {
     struct thread *donor = list_entry(e, struct thread, donor_elem);
@@ -264,7 +264,7 @@ void lock_release(struct lock *lock) {
     else
       e = list_next(e);
   }
-  // recompute priority
+  // recompute priority to the new highest priority
   thread_recompute_priority(cur);
   lock->holder = NULL;
   sema_up(&lock->semaphore);

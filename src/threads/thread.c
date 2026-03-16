@@ -75,6 +75,7 @@ static bool thread_priority_greater (const struct list_elem *a,
                                      void *aux UNUSED);
 void thread_recompute_priority (struct thread *t);
 
+/** Recomputes the priority of a thread based on its original priority and its donors. */
 void thread_recompute_priority (struct thread *t)
 {
   t->priority = t->original_priority;

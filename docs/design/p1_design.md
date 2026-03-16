@@ -28,25 +28,21 @@
 
 ### Files to Modify
 
-
-| File                   | What to Do                                                                                                                                                                               |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/threads/thread.h` | Add a `wakeup_tick` field (type `int64_t`) to `struct thread`.                                                                                                                           |
+| File | What to Do |
+| --- | --- |
+| `src/threads/thread.h` | Add a `wakeup_tick` field (type `int64_t`) to `struct thread`. |
 | `src/threads/thread.c` | Initialize `wakeup_tick` in `init_thread()`. Declare and initialize a global `sleep_list` (`struct list`). Provide a `list_less_func` comparator that orders by `wakeup_tick` ascending. |
-| `src/devices/timer.c`  | Rewrite `timer_sleep()` to block instead of spin. Modify `timer_interrupt()` to wake threads whose deadline has passed.                                                                  |
-| `src/devices/timer.h`  | No changes expected (API is unchanged).                                                                                                                                                  |
-
+| `src/devices/timer.c` | Rewrite `timer_sleep()` to block instead of spin. Modify `timer_interrupt()` to wake threads whose deadline has passed. |
+| `src/devices/timer.h` | No changes expected (API is unchanged). |
 
 ### Files to Read / Understand First
 
-
-| File                      | Why                                                                                             |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `src/lib/kernel/list.h`   | Understand `list_insert_ordered()`, `list_less_func`, `list_entry`, iteration macros.           |
-| `src/lib/kernel/list.c`   | Implementation of the ordered-insert and traversal helpers.                                     |
-| `src/threads/interrupt.h` | Understand `intr_disable()`, `intr_set_level()`, `intr_context()`, `enum intr_level`.           |
-| `src/threads/thread.c`    | Understand `thread_block()`, `thread_unblock()`, `thread_current()`, the existing `ready_list`. |
-
+| File | Why |
+| --- | --- |
+| `src/lib/kernel/list.h` | Understand `list_insert_ordered()`, `list_less_func`, `list_entry`, iteration macros. |
+| `src/lib/kernel/list.c` | Implementation of the ordered-insert and traversal helpers. |
+| `src/threads/interrupt.h` | Understand `intr_disable()`, `intr_set_level()`, `intr_context()`, `enum intr_level`. |
+| `src/threads/thread.c` | Understand `thread_block()`, `thread_unblock()`, `thread_current()`, the existing `ready_list`. |
 
 ### Step-by-Step Plan
 
@@ -94,24 +90,20 @@
 
 ### Files to Modify
 
-
-| File                   | What to Do                                                                                                                                                                                                                                                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| File | What to Do |
+| --- | --- |
 | `src/threads/thread.c` | Change `thread_unblock()` to insert into `ready_list` in priority order (use `list_insert_ordered()`). Change `thread_yield()` similarly. Change `next_thread_to_run()` to pop the front (highest priority). After `thread_unblock()` and `thread_create()`, check if the new thread has higher priority than the running thread — if so, yield. |
-| `src/threads/thread.h` | Declare a `thread_priority_less()` comparator if you want it accessible from `synch.c`.                                                                                                                                                                                                                                                          |
-| `src/threads/synch.c`  | Modify `sema_up()`: unblock the highest-priority waiter (use `list_max()` or keep waiters sorted). Modify `sema_down()`: insert into `sema->waiters` in priority order. Modify `cond_signal()`: signal the condition waiter whose semaphore has the highest-priority thread.                                                                     |
-| `src/threads/synch.h`  | No struct changes expected yet.                                                                                                                                                                                                                                                                                                                  |
-
+| `src/threads/thread.h` | Declare a `thread_priority_less()` comparator if you want it accessible from `synch.c`. |
+| `src/threads/synch.c` | Modify `sema_up()`: unblock the highest-priority waiter (use `list_max()` or keep waiters sorted). Modify `sema_down()`: insert into `sema->waiters` in priority order. Modify `cond_signal()`: signal the condition waiter whose semaphore has the highest-priority thread. |
+| `src/threads/synch.h` | No struct changes expected yet. |
 
 ### Files to Read / Understand First
 
-
-| File                    | Why                                                                                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/threads/thread.c`  | Understand `thread_unblock()` (currently uses `list_push_back`), `thread_yield()`, `next_thread_to_run()`, `thread_create()`.              |
-| `src/threads/synch.c`   | Understand `sema_down()` (pushes to back of waiters), `sema_up()` (pops from front), `cond_signal()` (pops from front of `cond->waiters`). |
-| `src/lib/kernel/list.h` | `list_insert_ordered()`, `list_max()`, `list_min()`, `list_sort()`.                                                                        |
-
+| File | Why |
+| --- | --- |
+| `src/threads/thread.c` | Understand `thread_unblock()` (currently uses `list_push_back`), `thread_yield()`, `next_thread_to_run()`, `thread_create()`. |
+| `src/threads/synch.c` | Understand `sema_down()` (pushes to back of waiters), `sema_up()` (pops from front), `cond_signal()` (pops from front of `cond->waiters`). |
+| `src/lib/kernel/list.h` | `list_insert_ordered()`, `list_max()`, `list_min()`, `list_sort()`. |
 
 ### Step-by-Step Plan
 
@@ -138,7 +130,7 @@
 
 ### Things to Consider
 
-- **Comparator direction:** PintOS `list_insert_ordered()` inserts *before* the first element for which `less()` returns false. To keep highest-priority at the front, your comparator should return `true` when A's priority > B's priority.
+- **Comparator direction:** PintOS `list_insert_ordered()` inserts *before* the first element for which `less()` returns false. To keep highest-priority at the front, your comparator should return `true` when A's priority &gt; B's priority.
 - **Preemption from interrupt context:** `thread_unblock()` may be called inside `timer_interrupt()`. You cannot call `thread_yield()` from interrupt context — use `intr_yield_on_return()` instead. Check `intr_context()` to decide.
 - **Re-sorting after priority changes:** When a thread's priority changes later (Task 3/4), queues may need re-sorting. Keep this in mind.
 - **Idle thread:** Never yield to the idle thread. The `thread_yield()` / `next_thread_to_run()` logic already handles this since the idle thread is never on `ready_list`.
@@ -151,30 +143,26 @@
 
 ### Files to Modify
 
-
-| File                   | What to Do                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/threads/thread.h` | Add to `struct thread`: `int original_priority;`, `struct list donors;` (list of threads donating to this one), `struct list_elem donor_elem;` (for being in another thread's `donors` list), `struct lock *waiting_on_lock;` (the lock this thread is blocked on, or `NULL`).                                                                                                                                                                                         |
-| `src/threads/thread.c` | Initialize new fields in `init_thread()`: `original_priority = priority`, `list_init(&donors)`, `waiting_on_lock = NULL`. Add a helper `thread_recompute_priority(struct thread *t)` that sets `t->priority = max(t->original_priority, max donation from t->donors)`. Declare it in `thread.h` so `synch.c` can call it.                                                                                                                                              |
-| `src/threads/synch.c`  | Modify `lock_acquire()`: before `sema_down()`, set `cur->waiting_on_lock = lock`, donate priority up the holder chain (depth limit 8). After `sema_down()`, clear `waiting_on_lock`, set `lock->holder = cur`. Modify `lock_release()`: remove all donors whose `waiting_on_lock` matches the released lock, call `thread_recompute_priority(cur)`, then set `lock->holder = NULL` and `sema_up()`. After `sema_up()`, yield if a higher-priority thread is now ready. |
-| `src/threads/synch.h`  | No struct changes required (the existing `struct lock` already has a `holder` field and an embedded semaphore).                                                                                                                                                                                                                                                                                                                                                        |
-
+| File | What to Do |
+| --- | --- |
+| `src/threads/thread.h` | Add to `struct thread`: `int original_priority;`, `struct list donors;` (list of threads donating to this one), `struct list_elem donor_elem;` (for being in another thread's `donors` list), `struct lock *waiting_on_lock;` (the lock this thread is blocked on, or `NULL`). |
+| `src/threads/thread.c` | Initialize new fields in `init_thread()`: `original_priority = priority`, `list_init(&donors)`, `waiting_on_lock = NULL`. Add a helper `thread_recompute_priority(struct thread *t)` that sets `t->priority = max(t->original_priority, max donation from t->donors)`. Declare it in `thread.h` so `synch.c` can call it. |
+| `src/threads/synch.c` | Modify `lock_acquire()`: before `sema_down()`, set `cur->waiting_on_lock = lock`, donate priority up the holder chain (depth limit 8). After `sema_down()`, clear `waiting_on_lock`, set `lock->holder = cur`. Modify `lock_release()`: remove all donors whose `waiting_on_lock` matches the released lock, call `thread_recompute_priority(cur)`, then set `lock->holder = NULL` and `sema_up()`. After `sema_up()`, yield if a higher-priority thread is now ready. |
+| `src/threads/synch.h` | No struct changes required (the existing `struct lock` already has a `holder` field and an embedded semaphore). |
 
 ### Files to Read / Understand First
 
-
-| File                                            | Why                                                                                                                                             |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/threads/synch.c`                           | Understand the full `lock_acquire()` → `sema_down()` → `thread_block()` path, and the `lock_release()` → `sema_up()` → `thread_unblock()` path. |
-| `src/threads/thread.h`                          | Understand the existing `struct thread` layout and the 4KB page constraint (don't bloat the struct).                                            |
-| `src/tests/threads/priority-donate-one.c`       | Basic single donation: two higher-priority threads block on one lock.                                                                           |
-| `src/tests/threads/priority-donate-multiple.c`  | One thread holds two locks with different-priority donors on each. Releasing one lock drops only that lock's donation.                          |
-| `src/tests/threads/priority-donate-multiple2.c` | Same as above but with a different release order and an interloper thread.                                                                      |
-| `src/tests/threads/priority-donate-nest.c`      | Nested donation: H donates to M, which propagates to L through a chain of two locks.                                                            |
-| `src/tests/threads/priority-donate-chain.c`     | Deep nested donation chain of 7 locks and 7 donor threads (depth limit = 8).                                                                    |
-| `src/tests/threads/priority-donate-lower.c`     | Calling `thread_set_priority()` to a lower value while a donation is active must not override the donation.                                     |
-| `src/tests/threads/priority-donate-sema.c`      | Donation interacts correctly when the lock holder is blocked on a semaphore.                                                                    |
-
+| File | Why |
+| --- | --- |
+| `src/threads/synch.c` | Understand the full `lock_acquire()` → `sema_down()` → `thread_block()` path, and the `lock_release()` → `sema_up()` → `thread_unblock()` path. |
+| `src/threads/thread.h` | Understand the existing `struct thread` layout and the 4KB page constraint (don't bloat the struct). |
+| `src/tests/threads/priority-donate-one.c` | Basic single donation: two higher-priority threads block on one lock. |
+| `src/tests/threads/priority-donate-multiple.c` | One thread holds two locks with different-priority donors on each. Releasing one lock drops only that lock's donation. |
+| `src/tests/threads/priority-donate-multiple2.c` | Same as above but with a different release order and an interloper thread. |
+| `src/tests/threads/priority-donate-nest.c` | Nested donation: H donates to M, which propagates to L through a chain of two locks. |
+| `src/tests/threads/priority-donate-chain.c` | Deep nested donation chain of 7 locks and 7 donor threads (depth limit = 8). |
+| `src/tests/threads/priority-donate-lower.c` | Calling `thread_set_priority()` to a lower value while a donation is active must not override the donation. |
+| `src/tests/threads/priority-donate-sema.c` | Donation interacts correctly when the lock holder is blocked on a semaphore. |
 
 ### Step-by-Step Plan
 
@@ -221,24 +209,6 @@ cur->waiting_on_lock = lock;
 
 1. If the lock is already held, donate our priority up the chain:
 
-```c
-if (lock->holder != NULL)
-  {
-    list_insert_ordered (&lock->holder->donors, &cur->donor_elem,
-                         thread_priority_greater, NULL);
-
-    struct lock *l = lock;
-    int depth = 0;
-    while (l != NULL && l->holder != NULL && depth < 8)
-      {
-        if (cur->priority > l->holder->priority)
-          l->holder->priority = cur->priority;
-        l = l->holder->waiting_on_lock;
-        depth++;
-      }
-  }
-```
-
 Concrete trace through `priority-donate-nest`:
 
 - Thread L (pri 31) holds lock A.
@@ -247,41 +217,11 @@ Concrete trace through `priority-donate-nest`:
 
 1. After `sema_down()` returns (we now own the lock):
 
-```c
-cur->waiting_on_lock = NULL;
-lock->holder = cur;
-```
-
-You should disable interrupts around the donation section (before `sema_down()`) to prevent a timer interrupt from seeing inconsistent state:
-
-```c
-enum intr_level old_level = intr_disable ();
-cur->waiting_on_lock = lock;
-/* donation chain walk here */
-intr_set_level (old_level);
-sema_down (&lock->semaphore);
-old_level = intr_disable ();
-cur->waiting_on_lock = NULL;
-lock->holder = cur;
-intr_set_level (old_level);
-```
+You should disable interrupts around the donation section (before `sema_down()`) to prevent a timer interrupt from seeing inconsistent state
 
 **Step 4 — Implement the priority recomputation helper (**`src/threads/thread.c`**)**
 
-```c
-void
-thread_recompute_priority (struct thread *t)
-{
-  t->priority = t->original_priority;
-  if (!list_empty (&t->donors))
-    {
-      struct thread *top_donor = list_entry (list_front (&t->donors),
-                                             struct thread, donor_elem);
-      if (top_donor->priority > t->priority)
-        t->priority = top_donor->priority;
-    }
-}
-```
+ 
 
 This works because `donors` is kept sorted in descending priority order (highest-priority donor at the front via `list_insert_ordered`). Checking the front element is O(1).
 
@@ -295,33 +235,16 @@ void thread_recompute_priority (struct thread *);
 
 Before the existing `sema_up()` call, remove all donors that were waiting on the lock being released, then recalculate priority:
 
-```c
-struct thread *cur = thread_current ();
+ 
 
-struct list_elem *e = list_begin (&cur->donors);
-while (e != list_end (&cur->donors))
-  {
-    struct thread *t = list_entry (e, struct thread, donor_elem);
-    if (t->waiting_on_lock == lock)
-      e = list_remove (e);
-    else
-      e = list_next (e);
-  }
-
-thread_recompute_priority (cur);
-
-lock->holder = NULL;
-sema_up (&lock->semaphore);
-```
-
-Trace through `priority-donate-multiple`:
+Trace through `priority-donate-multiple.output`:
 
 - Main (pri 31) holds locks A and B.
 - Thread a (pri 34) donates via lock A. Thread b (pri 36) donates via lock B. Main's effective priority = 36.
 - Main releases lock B: remove donors where `waiting_on_lock == &b` → thread b removed. Recompute: `max(31, 34) = 34`.
 - Main releases lock A: remove thread a. Recompute: `max(31) = 31`. Main drops to base.
 
-Trace through `priority-donate-multiple2`:
+Trace through `priority-donate-multiple2.output`:
 
 - Main (pri 31) holds locks A and B. Thread a (pri 34) donates via A. Thread b (pri 36) donates via B. Thread c (pri 32) has no lock, just sits on the ready list.
 - Main releases lock A first: remove thread a. Recompute: `max(31, 36) = 36`. Main stays at 36, so thread c (pri 32) still doesn't run.
@@ -360,21 +283,17 @@ This is not a single location — it is a principle enforced everywhere:
 
 ### Files to Modify
 
-
-| File                   | What to Do                                                   |
-| ---------------------- | ------------------------------------------------------------ |
+| File | What to Do |
+| --- | --- |
 | `src/threads/thread.c` | Rewrite `thread_set_priority()` and `thread_get_priority()`. |
-
 
 ### Files to Read / Understand First
 
-
-| File                                        | Why                                                                                                 |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `src/threads/thread.c`                      | See the current stubs at lines 335–346.                                                             |
-| `src/tests/threads/priority-change.c`       | Verifies that lowering your own priority causes preemption.                                         |
+| File | Why |
+| --- | --- |
+| `src/threads/thread.c` | See the current stubs at lines 335–346. |
+| `src/tests/threads/priority-change.c` | Verifies that lowering your own priority causes preemption. |
 | `src/tests/threads/priority-donate-lower.c` | Verifies that lowering base priority while a donation is active does not reduce effective priority. |
-
 
 ### Step-by-Step Plan
 
@@ -387,8 +306,6 @@ Key points:
 
 **Step 2 — Rewrite** `thread_get_priority()`
 
-
-
 This function is actually unchanged from the original skeleton. The `priority` field is already the *effective* priority once donation logic is in place. No extra work is needed here.
 
 ### Things to Consider
@@ -398,4 +315,3 @@ This function is actually unchanged from the original skeleton. The `priority` f
 - **Yield check is essential.** The `priority-change` test creates a higher-priority thread, then the main thread lowers its own priority. Without the yield check, the main thread would keep running even though a higher-priority thread is ready.
 - **No interrupt disable needed for the simple case.** `thread_set_priority()` only modifies the calling thread's own fields. Since only the running thread calls it (not an interrupt handler), there is no race on `original_priority`. However, if your `thread_recompute_priority()` accesses the `donors` list, you may want to disable interrupts briefly during the recomputation to prevent a concurrent interrupt from modifying the list.
 - **MLFQS guard.** The advanced scheduler (MLFQS) does not use manual priority setting. If you later implement MLFQS, `thread_set_priority()` should be a no-op when `thread_mlfqs` is true. For now this is not required, but keep it in mind.
-
